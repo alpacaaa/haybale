@@ -6,6 +6,7 @@ module Lib (
 , startServer
 ) where
 
+import Control.Monad.Trans.Class (lift)
 import Control.Monad.IO.Class (liftIO)
 import qualified Network.Http.Client as Http
 import qualified Data.ByteString as S
@@ -18,6 +19,10 @@ import OpenSSL (withOpenSSL)
 
 import qualified Snap.Core as Snap
 import Snap.Http.Server (quickHttpServe)
+
+import qualified Web.JWT as JWT
+import Data.Text.Encoding (encodeUtf8)
+import qualified Data.Map.Strict as Map
 
 dropboxtoken = fmap (head . lines) (readFile "dropbox-token")
 
@@ -64,7 +69,8 @@ site :: Snap.Snap ()
 site =
   Snap.route [
     ("/", home),
-    ("upload", upload)
+    ("upload", upload),
+    ("jwt", testJwt)
     ]
 
 
@@ -76,3 +82,24 @@ upload = do
 
 home =
   Snap.writeBS "Welcome"
+
+
+testJwt = do
+  let key = JWT.secret "donuts"
+  let claim = JWT.def {
+    JWT.unregisteredClaims = Map.fromList [
+      ("something", "value")
+    ]
+  }
+  let token = JWT.encodeSigned JWT.HS256 key claim
+
+  let wrongsecret = JWT.secret "wrong"
+  let result = JWT.decode token
+  let verify = JWT.verify wrongsecret =<< result
+
+  -- Snap.writeBS $ SL.pack $ show result
+
+  Snap.writeBS $ SL.pack $ show verify
+
+  -- Snap.writeBS $ encodeUtf8 token
+  -- Snap.writeBS $ SL.pack (show result)

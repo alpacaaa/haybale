@@ -23,6 +23,11 @@ library
                      , HsOpenSSL
                      , snap-core
                      , snap-server
+                     , hoauth2
+                     , jwt
+                     , text
+                     , containers
+                     , transformers
   default-language:    Haskell2010
 
 executable haskell-haybale-exe
