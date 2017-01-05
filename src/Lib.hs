@@ -28,6 +28,7 @@ import Data.Text.Encoding (encodeUtf8)
 import qualified Data.Map.Strict as Map
 
 import qualified Data.Ini as Ini
+import qualified Data.Text as T
 
 dropboxtoken = fmap (head . lines) (readFile "dropbox-token")
 
@@ -73,6 +74,7 @@ startServer = do
   let (Right client) = Ini.lookupValue "DROPBOX" "client" config
   let (Right secret) = Ini.lookupValue "DROPBOX" "secret" config
   let (Right callback) = Ini.lookupValue "DROPBOX" "callback" config
+  let (Right haybaleSecret) = Ini.lookupValue "HAYBALE" "secret" config
 
   let oauthConfig = OAuth.OAuth2 {
     oauthClientId = encodeUtf8 client,
@@ -82,16 +84,16 @@ startServer = do
     oauthCallback = Just $ encodeUtf8 callback
   }
 
-  quickHttpServe (site oauthConfig)
+  quickHttpServe (site oauthConfig haybaleSecret)
 
-site :: OAuth.OAuth2 -> Snap.Snap ()
-site oauthConfig =
+site :: OAuth.OAuth2 -> T.Text -> Snap.Snap ()
+site oauthConfig secret =
   Snap.route [
     ("/", home),
     ("upload", upload),
     ("jwt", testJwt),
     ("dropbox-login", authenticate oauthConfig),
-    ("oauth-callback", generateToken oauthConfig)
+    ("oauth-callback", generateToken oauthConfig secret)
     ]
 
 
@@ -133,10 +135,11 @@ authenticate oauthConfig = do
   Snap.redirect url
 
 
-generateToken :: OAuth.OAuth2 -> Snap.Snap ()
-generateToken oauthConfig = do
+generateToken :: OAuth.OAuth2 -> T.Text -> Snap.Snap ()
+generateToken oauthConfig secret = do
   (Just code) <- Snap.getParam "code"
   mgr <- liftIO $ Client.newManager tlsManagerSettings
   (Right token) <- liftIO $ OAuth.fetchAccessToken mgr oauthConfig code
 
+  -- https://github.com/vincenthz/hs-crypto-cipher
   Snap.writeBS (accessToken token)
