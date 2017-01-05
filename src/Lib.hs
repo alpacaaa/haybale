@@ -8,6 +8,7 @@ module Lib (
 
 import Control.Monad.Trans.Class (lift)
 import Control.Monad.IO.Class (liftIO)
+import Network.OAuth.OAuth2 as OAuth
 import qualified Network.Http.Client as Http
 import qualified Data.ByteString as S
 import qualified Data.ByteString.Char8 as SL
@@ -23,6 +24,8 @@ import Snap.Http.Server (quickHttpServe)
 import qualified Web.JWT as JWT
 import Data.Text.Encoding (encodeUtf8)
 import qualified Data.Map.Strict as Map
+
+import qualified Data.Ini as Ini
 
 dropboxtoken = fmap (head . lines) (readFile "dropbox-token")
 
@@ -63,14 +66,29 @@ fakeRequestUploadFile =
 --}
 
 startServer :: IO ()
-startServer = quickHttpServe site
+startServer = do
+  (Right config) <- Ini.readIniFile "config.ini"
+  let (Right client) = Ini.lookupValue "DROPBOX" "client" config
+  let (Right secret) = Ini.lookupValue "DROPBOX" "secret" config
+  let (Right callback) = Ini.lookupValue "DROPBOX" "callback" config
 
-site :: Snap.Snap ()
-site =
+  let oauthConfig = OAuth.OAuth2 {
+    oauthClientId = encodeUtf8 client,
+    oauthClientSecret = encodeUtf8 secret,
+    oauthOAuthorizeEndpoint = "https://api.dropboxapi.com/oauth2/authorize",
+    oauthAccessTokenEndpoint = "https://api.dropboxapi.com/oauth2/token",
+    oauthCallback = Just $ encodeUtf8 callback
+  }
+
+  quickHttpServe (site oauthConfig)
+
+site :: OAuth.OAuth2 -> Snap.Snap ()
+site oauthConfig =
   Snap.route [
     ("/", home),
     ("upload", upload),
-    ("jwt", testJwt)
+    ("jwt", testJwt),
+    ("dropbox-login", authenticate oauthConfig)
     ]
 
 
@@ -103,3 +121,6 @@ testJwt = do
 
   -- Snap.writeBS $ encodeUtf8 token
   -- Snap.writeBS $ SL.pack (show result)
+
+
+authenticate oauthConfig = Snap.writeBS "yo"
