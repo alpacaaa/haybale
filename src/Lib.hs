@@ -10,6 +10,8 @@ import Control.Monad.Trans.Class (lift)
 import Control.Monad.IO.Class (liftIO)
 import Network.OAuth.OAuth2 as OAuth
 import qualified Network.Http.Client as Http
+import qualified Network.HTTP.Client as Client
+import Network.HTTP.Client.TLS (tlsManagerSettings)
 import qualified Data.ByteString as S
 import qualified Data.ByteString.Char8 as SL
 
@@ -75,7 +77,7 @@ startServer = do
   let oauthConfig = OAuth.OAuth2 {
     oauthClientId = encodeUtf8 client,
     oauthClientSecret = encodeUtf8 secret,
-    oauthOAuthorizeEndpoint = "https://api.dropboxapi.com/oauth2/authorize",
+    oauthOAuthorizeEndpoint = "https://www.dropbox.com/oauth2/authorize",
     oauthAccessTokenEndpoint = "https://api.dropboxapi.com/oauth2/token",
     oauthCallback = Just $ encodeUtf8 callback
   }
@@ -88,7 +90,8 @@ site oauthConfig =
     ("/", home),
     ("upload", upload),
     ("jwt", testJwt),
-    ("dropbox-login", authenticate oauthConfig)
+    ("dropbox-login", authenticate oauthConfig),
+    ("oauth-callback", generateToken oauthConfig)
     ]
 
 
@@ -123,4 +126,17 @@ testJwt = do
   -- Snap.writeBS $ SL.pack (show result)
 
 
-authenticate oauthConfig = Snap.writeBS "yo"
+authenticate :: OAuth.OAuth2 -> Snap.Snap ()
+authenticate oauthConfig = do
+  let url = OAuth.authorizationUrl oauthConfig
+  liftIO $ putStrLn $ SL.unpack url
+  Snap.redirect url
+
+
+generateToken :: OAuth.OAuth2 -> Snap.Snap ()
+generateToken oauthConfig = do
+  (Just code) <- Snap.getParam "code"
+  mgr <- liftIO $ Client.newManager tlsManagerSettings
+  (Right token) <- liftIO $ OAuth.fetchAccessToken mgr oauthConfig code
+
+  Snap.writeBS (accessToken token)
