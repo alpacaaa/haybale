@@ -31,6 +31,7 @@ library
                      , ini
                      , http-client
                      , http-client-tls
+                     , crypto-simple
   default-language:    Haskell2010
 
 executable haskell-haybale-exe

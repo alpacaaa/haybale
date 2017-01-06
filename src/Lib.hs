@@ -29,6 +29,7 @@ import qualified Data.Map.Strict as Map
 
 import qualified Data.Ini as Ini
 import qualified Data.Text as T
+import Crypto.Simple.CBC as Crypto
 
 dropboxtoken = fmap (head . lines) (readFile "dropbox-token")
 
@@ -141,5 +142,6 @@ generateToken oauthConfig secret = do
   mgr <- liftIO $ Client.newManager tlsManagerSettings
   (Right token) <- liftIO $ OAuth.fetchAccessToken mgr oauthConfig code
 
-  -- https://github.com/vincenthz/hs-crypto-cipher
-  Snap.writeBS (accessToken token)
+  let key = encodeUtf8 secret
+  haybaleKey <- liftIO $ Crypto.encrypt key (accessToken token)
+  Snap.writeBS haybaleKey

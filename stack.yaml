@@ -45,6 +45,7 @@ extra-deps:
   - http-conduit-2.2.3
   - http-client-0.5.5
   - http-client-tls-0.3.3
+  - crypto-simple-0.1.0.0
 
 
 # Override default flag values for local packages and extra-deps
