@@ -24,12 +24,13 @@ import qualified Snap.Core as Snap
 import Snap.Http.Server (quickHttpServe)
 
 import qualified Web.JWT as JWT
-import Data.Text.Encoding (encodeUtf8)
+import Data.Text.Encoding (encodeUtf8, decodeUtf8)
 import qualified Data.Map.Strict as Map
 
 import qualified Data.Ini as Ini
 import qualified Data.Text as T
 import Crypto.Simple.CBC as Crypto
+import Data.Aeson (Value(..))
 
 dropboxtoken = fmap (head . lines) (readFile "dropbox-token")
 
@@ -143,5 +144,13 @@ generateToken oauthConfig secret = do
   (Right token) <- liftIO $ OAuth.fetchAccessToken mgr oauthConfig code
 
   let key = encodeUtf8 secret
-  haybaleKey <- liftIO $ Crypto.encrypt key (accessToken token)
+  let jwtKey = JWT.secret "donuts"
+  let claim = JWT.def {
+    JWT.unregisteredClaims = Map.fromList [
+      ("token", String $ decodeUtf8 $ accessToken token)
+    ]
+  }
+  let jwt = JWT.encodeSigned JWT.HS256 jwtKey claim
+
+  haybaleKey <- liftIO $ Crypto.encrypt key $ encodeUtf8 jwt
   Snap.writeBS haybaleKey
