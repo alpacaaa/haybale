@@ -31,6 +31,7 @@ import qualified Data.Ini as Ini
 import qualified Data.Text as T
 import Crypto.Simple.CBC as Crypto
 import Data.Aeson (Value(..))
+import qualified Data.ByteString.Base64 as Base64
 
 dropboxtoken = fmap (head . lines) (readFile "dropbox-token")
 
@@ -143,14 +144,20 @@ generateToken oauthConfig secret = do
   mgr <- liftIO $ Client.newManager tlsManagerSettings
   (Right token) <- liftIO $ OAuth.fetchAccessToken mgr oauthConfig code
 
-  let key = encodeUtf8 secret
-  let jwtKey = JWT.secret "donuts"
-  let claim = JWT.def {
-    JWT.unregisteredClaims = Map.fromList [
-      ("token", String $ decodeUtf8 $ accessToken token)
-    ]
-  }
-  let jwt = JWT.encodeSigned JWT.HS256 jwtKey claim
+  let key = encodeUtf8 secret -- must be less than 32 bytes
+  crypted <- liftIO $ Crypto.encrypt key $ accessToken token
+  let encoded = Base64.encode crypted
+  Snap.writeBS encoded
 
-  haybaleKey <- liftIO $ Crypto.encrypt key $ encodeUtf8 jwt
-  Snap.writeBS haybaleKey
+
+  -- let key = encodeUtf8 secret
+  -- let jwtKey = JWT.secret "donuts"
+  -- let claim = JWT.def {
+  --   JWT.unregisteredClaims = Map.fromList [
+  --     ("token", String $ decodeUtf8 $ accessToken token)
+  --   ]
+  -- }
+  -- let jwt = JWT.encodeSigned JWT.HS256 jwtKey claim
+  --
+  -- haybaleKey <- liftIO $ Crypto.encrypt key $ encodeUtf8 jwt
+  -- Snap.writeBS haybaleKey
