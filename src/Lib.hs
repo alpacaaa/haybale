@@ -145,19 +145,14 @@ generateToken oauthConfig secret = do
   (Right token) <- liftIO $ OAuth.fetchAccessToken mgr oauthConfig code
 
   let key = encodeUtf8 secret -- must be less than 32 bytes
-  crypted <- liftIO $ Crypto.encrypt key $ accessToken token
-  let encoded = Base64.encode crypted
-  Snap.writeBS encoded
+  let jwtKey = JWT.secret "donuts"
+  let claim = JWT.def {
+    JWT.unregisteredClaims = Map.fromList [
+      ("token", String $ decodeUtf8 $ accessToken token)
+    ]
+  }
+  let jwt = JWT.encodeSigned JWT.HS256 jwtKey claim
 
-
-  -- let key = encodeUtf8 secret
-  -- let jwtKey = JWT.secret "donuts"
-  -- let claim = JWT.def {
-  --   JWT.unregisteredClaims = Map.fromList [
-  --     ("token", String $ decodeUtf8 $ accessToken token)
-  --   ]
-  -- }
-  -- let jwt = JWT.encodeSigned JWT.HS256 jwtKey claim
-  --
-  -- haybaleKey <- liftIO $ Crypto.encrypt key $ encodeUtf8 jwt
-  -- Snap.writeBS haybaleKey
+  crypted <- liftIO $ Crypto.encrypt key $ encodeUtf8 jwt
+  let haybaleKey = Base64.encode crypted
+  Snap.writeBS haybaleKey
